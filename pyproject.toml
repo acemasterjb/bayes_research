@@ -1,0 +1,17 @@
+[project]
+name = "bayes"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14.0"
+dependencies = [
+    "arviz>=0.23.0",
+    "cloudpickle>=3.1.2",
+    "httpx>=0.28.1",
+    "numpy>=2.3.5",
+    "plotly>=6.5.0",
+    "pymc>=5.26.1",
+    "pyro-ppl>=1.9.1",
+    "scikit-learn>=1.7.2",
+    "statsmodels>=0.14.6",
+]
