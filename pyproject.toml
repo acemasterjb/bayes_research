@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14.0"
 dependencies = [
+    "arch>=8.0.0",
     "arviz>=0.23.0",
     "cloudpickle>=3.1.2",
     "httpx>=0.28.1",

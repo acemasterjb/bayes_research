@@ -5,6 +5,59 @@ import pytensor
 import numpy as np
 
 
+def generate_garch_price_paths(
+    s0: float,
+    T: int,
+    N: int,
+    mu: float,
+    omega: float,
+    alpha: float,
+    beta: float,
+    last_return: float,
+    last_vol_sq: float,
+    p_jump: float,
+    mu_jump: float,
+    sigma_jump: float,
+):
+    """
+    Generates N price paths over T steps for a single set of GARCH parameters,
+    including a conditional jump process.
+    """
+    returns_matrix = np.zeros((T, N))
+
+    current_returns = np.full(N, last_return)
+    current_vol_sqs = np.full(N, last_vol_sq)
+
+    rng = np.random.default_rng(seed=42)
+
+    for t in range(T):
+        errors = current_returns - mu
+        next_vol_sqs = omega + alpha * errors**2 + beta * current_vol_sqs
+
+        # Probabilistically choose between a GARCH shock and a Jump shock
+        is_jump = rng.random(N) < p_jump
+
+        # GARCH shocks (Student-T)
+        garch_shocks = rng.standard_t(df=3, size=N)
+
+        # Jump shocks (Normal)
+        jump_shocks = rng.normal(mu_jump, sigma_jump, size=N)
+
+        # Apply shocks where they occur
+        shocks = np.where(is_jump, jump_shocks, garch_shocks)
+
+        next_returns = mu + np.sqrt(next_vol_sqs) * shocks
+
+        returns_matrix[t, :] = next_returns
+        current_returns = next_returns
+        current_vol_sqs = next_vol_sqs
+
+    price_paths = s0 * np.exp(np.cumsum(returns_matrix, axis=0))
+    price_paths = np.vstack([np.full(N, s0), price_paths])
+
+    return price_paths
+
+
 def forecast_garch_model(trace, last_return, last_vol_sq, n_forecast_steps: int = 30):
     """
     Forecasts future returns and volatility using the trained GARCH model.
@@ -62,7 +115,7 @@ def run_garch_model(returns: np.ndarray):
 
         alpha = pm.Deterministic("alpha", phi * rho)
         beta = pm.Deterministic("beta", phi * (1 - rho))
-        # nu = pm.Gamma("nu", alpha=2, beta=0.1)
+        nu = pm.Gamma("nu", alpha=2, beta=0.1)
 
         # --- GARCH(1,1) Recursion using pytensor.scan ---
         # The GARCH model requires a recursive function to compute the variance at each time step.
@@ -100,8 +153,8 @@ def run_garch_model(returns: np.ndarray):
         # --- Likelihood ---
         # The likelihood is a Student-T distribution, where the volatility (sigma)
         # at each time step `t` is determined by the GARCH recursion.
-        likelihood = pm.Normal(
-            "obs", mu=mu, sigma=pt.sqrt(full_sigma_sq), observed=returns
+        likelihood = pm.StudentT(
+            "obs", mu=mu, nu=nu, sigma=pt.sqrt(full_sigma_sq), observed=returns
         )
 
         # --- Sampling ---
